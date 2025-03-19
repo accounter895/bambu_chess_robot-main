@@ -3,7 +3,7 @@ import numpy as np
 
 def dress_detect(img):
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)        # 转换为灰度图像
-    circles = cv2.HoughCircles(img_gray, cv2.HOUGH_GRADIENT, dp=1, minDist=25, param1=50, param2=50)
+    circles = cv2.HoughCircles(img_gray, cv2.HOUGH_GRADIENT, dp=1, minDist=25, param1=50, param2=55)
     if circles is not None:
         circles = np.uint16(np.around(circles))  # 对圆的圆心坐标和半径四舍五入取整
     
@@ -28,6 +28,9 @@ def dress_detect(img):
     print("Black Chess Coordinates:", black_chess_coords)
     print("White Chess Coordinates:", white_chess_coords)
 
+import cv2
+import numpy as np
+
 def dress_borad_detect(img):
     # 转换为灰度图像
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -37,8 +40,6 @@ def dress_borad_detect(img):
 
     # 查找轮廓
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    #img_coutours = cv2.drawContours(img, contours, -1, (0, 255, 0), 2)
-    #cv2.imshow('Contours', img_coutours)
 
     # 找到最大的轮廓
     if contours:
@@ -58,31 +59,49 @@ def dress_borad_detect(img):
             for corner in corners:
                 cv2.circle(img, corner, 5, (0, 255, 0), -1)
             
-            # 计算棋盘9个格子的中心坐标
-            top_left, top_right, bottom_left, bottom_right = sorted(corners, key=lambda x: x[0] + x[1])
-            print('top_left:', top_left)
-            print('top_right:', top_right)
-            print('bottom_left:', bottom_left)
-            print('bottom_right:', bottom_right)
-            width = abs(top_right[1] - top_left[1]) // 3
-            height = abs(top_left[0] - bottom_left[0]) // 3
+            # 计算棋盘的中心点
+            center_x = int(sum([corner[0] for corner in corners]) / 4)
+            center_y = int(sum([corner[1] for corner in corners]) / 4)
+            print("Chessboard Center:", (center_x, center_y))
             
-            center_points = []
+            # 定义目标正方形的四个角点
+            target_corners = np.float32([[0, 0], [300, 0], [300, 300], [0, 300]])
+            src_corners = np.float32(corners)
+            
+            # 计算透视变换矩阵
+            M = cv2.getPerspectiveTransform(src_corners, target_corners)
+            
+            # 应用透视变换
+            warped_img = cv2.warpPerspective(img, M, (300, 300))
+            
+            # 计算正方形区域内每个小格子的中心点
+            width = 100
+            height = 100
+            center_points_warped = []
             for i in range(3):
                 for j in range(3):
-                    x = int(top_left[0] + (j + 0.5) * width)
-                    y = int(top_left[1] + (i + 0.5) * height)
-                    center_points.append((x, y))
-                    cv2.circle(img, (x, y), 3, (255, 255, 0), -1)  # 用黄色标记中心点
+                    x = int(j * width + width / 2)
+                    y = int(i * height + height / 2)
+                    center_points_warped.append((x, y))
+                    cv2.circle(warped_img, (x, y), 3, (255, 255, 0), -1)
+            
+            # 将中心点逆变换回原始图像坐标系
+            center_points = []
+            for point in center_points_warped:
+                x, y = point
+                src_point = np.array([[x, y]], dtype=np.float32)
+                dst_point = cv2.perspectiveTransform(src_point.reshape(-1, 1, 2), np.linalg.inv(M))[0][0]
+                center_points.append((int(dst_point[0]), int(dst_point[1])))
+                cv2.circle(img, (int(dst_point[0]), int(dst_point[1])), 3, (255, 255, 0), -1)
+            
             print("Center Points of Chessboard Grids:", center_points)
-
 
 if __name__ == '__main__':
     print("开始测试")
-    img_load = 'img\chessboard_f1.jpg'
+    img_load = 'img\chessboard_f2.jpg'
     img0 = cv2.imread(img_load)
     img_ori = cv2.resize(img0, None, fx=1/4, fy=1/4)
-    cv2.imshow('chessboard_f1', img_ori)
+    cv2.imshow('chessboard_f2', img_ori)
     dress_detect(img_ori)
     dress_borad_detect(img_ori)
     cv2.imshow('Detected Circles and Chessboard Corners', img_ori)
