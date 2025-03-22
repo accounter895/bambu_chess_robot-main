@@ -8,6 +8,11 @@ def img_preprocess(img):
     gray_img = cv2.cvtColor(opened_img, cv2.COLOR_BGR2GRAY)
     return gray_img    
 
+# 棋子识别
+# 在棋盘格外划定 ROI区域 并对图像进行色彩空间转换，由 BGR 转为 HSV 图像，
+# 使颜色能够更好的分离，通过所需的黑白双色二值化阈值，
+# 用这两个阈值分离出黑白两色即棋子颜色，再使用 findContours函数 进行轮廓检测，
+# 若轮廓中心在 ROI区域 内则其为所需的棋子，记录其坐标
 def dress_detect(img):
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)        # 转换为灰度图像
     circles = cv2.HoughCircles(img_gray, cv2.HOUGH_GRADIENT, dp=1, minDist=25, param1=50, param2=55)
